@@ -101,23 +101,25 @@ wait_for_service_in_eureka() {
 
 
 # 启动 Spring Boot 服务
+LOG_DIR="./log"
+mkdir -p "$LOG_DIR"
 for SERVICE in "${SERVICES[@]}"; do
   NAME=$(echo $SERVICE | awk '{print $1}')
   JAR=$(echo $SERVICE | awk '{print $2}')
   PORT=$(echo $SERVICE | awk '{print $4}')
-  LOG="${NAME}.log"
+  LOG="${LOG_DIR}/${NAME}.log"
 
   echo "🟢 启动 $NAME..."
   nohup java -jar "$JAR" > "$LOG" 2>&1 &
 
-#  if [ "$PORT" -eq 0 ]; then
-#    wait_for_service_in_eureka "$SERVICE_NAME"
-#  else
-#    wait_for_port "$PORT" "$SERVICE_NAME"
-#  fi
-  if [ "$PORT" -gt 0 ]; then
+  if [ "$PORT" -eq 0 ]; then
+    wait_for_service_in_eureka "$SERVICE_NAME"
+  else
     wait_for_port "$PORT" "$SERVICE_NAME"
   fi
+#  if [ "$PORT" -gt 0 ]; then
+#    wait_for_port "$PORT" "$SERVICE_NAME"
+#  fi
 done
 
 echo "🎉 所有容器与微服务均已成功启动！"

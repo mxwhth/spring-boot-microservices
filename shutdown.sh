@@ -16,9 +16,7 @@ echo "停止 Docker Compose 服务..."
 docker-compose down
 
 # 可选：删除日志文件
-echo "删除日志文件..."
-rm -f ./ConfigServer.log
-rm -f ./EurekaServer.log
-rm -f ./GatewayApplication.log
+echo "🧹 清理日志..."
+rm -rf ./log
 
 echo "服务已关闭并清理完成！"
