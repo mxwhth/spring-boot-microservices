@@ -12,6 +12,11 @@ services:
         - postgres_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
   zookeeper:
     container_name: zookeeper
@@ -22,6 +27,12 @@ services:
       - "zookeeper_data:/bitnami"
     environment:
       - ALLOW_ANONYMOUS_LOGIN=yes
+      - ZOO_4LW_COMMANDS_WHITELIST=ruok,stat,conf,wchc,wchp,dirs
+    healthcheck:
+      test: [ "CMD", "echo", "ruok", "|", "nc", "localhost", "2181" ]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
   kafka:
     container_name: kafka
@@ -42,6 +53,11 @@ services:
       - KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181
     depends_on:
       - zookeeper
+    healthcheck:
+      test: [ "CMD", "bash", "-c", "kafka-topics.sh --bootstrap-server localhost:9093 --list || exit 1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   kafka-ui:
     container_name: kafka-ui
