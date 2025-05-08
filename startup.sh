@@ -101,7 +101,7 @@ wait_for_service_in_eureka() {
 
 
 # 启动 Spring Boot 服务
-LOG_DIR="./log"
+LOG_DIR="./logs"
 mkdir -p "$LOG_DIR"
 for SERVICE in "${SERVICES[@]}"; do
   NAME=$(echo $SERVICE | awk '{print $1}')
@@ -111,6 +111,7 @@ for SERVICE in "${SERVICES[@]}"; do
 
   echo "🟢 启动 $NAME..."
   nohup java -jar "$JAR" > "$LOG" 2>&1 &
+#  nohup java -jar "$JAR" > /dev/null 2>&1 &
 
   if [ "$PORT" -eq 0 ]; then
     wait_for_service_in_eureka "$SERVICE_NAME"

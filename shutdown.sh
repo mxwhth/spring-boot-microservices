@@ -17,6 +17,6 @@ docker-compose down
 
 # 可选：删除日志文件
 echo "🧹 清理日志..."
-rm -rf ./log
+rm -rf ./logs
 
 echo "服务已关闭并清理完成！"
