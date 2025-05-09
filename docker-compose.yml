@@ -96,6 +96,7 @@ services:
       redis:
         condition: service_healthy
     environment:
+      ## redis://default@redis:6379
       - REDISINSIGHT_REDIS_HOSTS=local:redis:6379:yourStrongPassword
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:5540" ]

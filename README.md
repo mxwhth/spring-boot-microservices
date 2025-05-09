@@ -54,6 +54,40 @@
 * Lombok
 * Log4j2
 
+### 🔨 Run the Microservice
+
+<b>Local</b>
+
+<b>1 )</b> Clone project `git clone https://github.com/devsyx/spring-boot-microservices.git`
+
+<b>2 )</b> Go to the project's home directory :  `cd spring-boot-microservices`
+
+<b>3 )</b> Run startup script <b>`./startup.sh`</b></b> *Will start containers and services*
+
+<b>4 )</b> Firstly, call /auth/register API and then call /auth/login API, you can find token from the response data.</b>
+
+<b>5 )</b> Fill <b>`Bearer {token}`</b> in request header, and then you can explore other apis.</b>
+
+### ❌ Stop the Microservice
+
+<b>1 )</b> Go to the project's home directory :  `cd spring-boot-microservices`
+
+<b>2 )</b> Run shutdown script <b>`./shutdown.sh`</b></b> *Will kill services, shutdown containers and cleanup log files.*
+
+
+### Application's Url
+
+- Eureka: http://localhost:8761/
+- PostgreSQL:
+    - URL: jdbc:postgresql://localhost:5432/microservice
+    - User: postgres
+    - Password: 55
+- Kafka-UI: http://localhost:9090/
+- Redis Insight
+    - Url: http://localhost:5540
+    - Redis Connection Url: redis://default@redis:6379
+- Swagger: {IP}:{Port}/swagger-ui/index.html *(Retrieve IP and Port from Eureka)*
+
 
 ### Explore Rest APIs
 
@@ -632,29 +666,6 @@
     
     Bearer Token : User Token
 ```
-
-
-### 🔨 Run the App
-
-<b>Local</b>
-
-<b>1 )</b> Clone project `git clone https://github.com/devsyx/spring-boot-microservices.git`
-
-<b>2 )</b> Go to the project's home directory :  `cd spring-boot-microservices`
-
-<b>3 )</b> Run docker compose <b>`docker compose up`</b></b>
-
-<b>4 )</b> Run <b>Eureka Server</b>
-
-<b>5 )</b> Run <b>Gateway</b>
-
-<b>6 )</b> Run <b>Config Server</b>
-
-<b>7 )</b> Run other services (<b>auth-service</b>, <b>user-service</b>, <b>job-service</b>, <b>notification-service</b>  and lastly <b>
-file-storage</b>)
-
-<b>8 )</b> For swagger ui localhost:8080/v1/{service-name}/swagger-ui/index.html</b>
-
 
 ### Screenshots
 

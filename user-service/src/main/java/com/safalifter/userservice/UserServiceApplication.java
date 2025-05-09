@@ -15,6 +15,7 @@ import org.springframework.cloud.openfeign.EnableFeignClients;
 public class UserServiceApplication implements CommandLineRunner {
     private final UserRepository userRepository;
 
+
     public UserServiceApplication(UserRepository userRepository) {
         this.userRepository = userRepository;
     }

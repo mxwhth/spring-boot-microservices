@@ -1,10 +1,13 @@
 package com.safalifter.gateway.filter;
 
 import com.safalifter.gateway.util.JwtUtil;
+import org.apache.http.auth.AuthenticationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cloud.gateway.filter.GatewayFilter;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.http.server.reactive.ServerHttpResponse;
@@ -19,6 +22,9 @@ import java.util.function.Predicate;
 public class JwtAuthenticationFilter implements GatewayFilter {
     private static final Logger logger = LoggerFactory.getLogger(JwtAuthenticationFilter.class);
     private final JwtUtil jwtUtil;
+
+    @Autowired
+    private RedisTemplate<String, String> redisTemplate;
 
     public JwtAuthenticationFilter(JwtUtil jwtUtil) {
         this.jwtUtil = jwtUtil;
@@ -43,7 +49,8 @@ public class JwtAuthenticationFilter implements GatewayFilter {
             if (token != null && token.startsWith("Bearer ")) token = token.substring(7);
 
             try {
-                jwtUtil.validateToken(token);
+                if (token == null || !redisTemplate.hasKey(token)) throw new AuthenticationException("Token not found");
+//                jwtUtil.validateToken(token);
             } catch (Exception e) {
                 return onError(exchange);
             }
