@@ -54,6 +54,9 @@
 * Lombok
 * Log4j2
 
+### Architecture Diagram
+<img src ="screenshots/architecture-diagram.png" alt="">
+
 ### 🔨 Run the Microservice
 
 <b>Local</b>
