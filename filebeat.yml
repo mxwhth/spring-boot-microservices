@@ -3,13 +3,33 @@ filebeat.inputs:
     enabled: true
     paths:
       - /logs/*.log
-    fields:
-      log_type: springboot
-    fields_under_root: true
+
+filebeat.config.modules:
+  enabled: false
 
 output.logstash:
   hosts: ["logstash:5044"]
 
+setup.kibana:
+  host: "kibana:5601"
+
+setup.template.settings:
+  index.number_of_shards: 1
+  index.codec: best_compression
+  _source.enabled: true
+
+setup.ilm.enabled: false
+
 processors:
   - add_host_metadata: ~
   - add_cloud_metadata: ~
+  - add_docker_metadata: ~
+  - add_kubernetes_metadata: ~
+
+logging.level: debug
+logging.to_files: true
+logging.files:
+  path: /usr/share/filebeat/logs
+  name: filebeat.log
+  keepfiles: 7
+  permissions: 0644

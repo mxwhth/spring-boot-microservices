@@ -7,12 +7,23 @@ import com.safalifter.jobservice.model.Job;
 import com.safalifter.jobservice.repository.JobRepository;
 import com.safalifter.jobservice.request.job.JobCreateRequest;
 import com.safalifter.jobservice.request.job.JobUpdateRequest;
+import com.safalifter.jobservice.utils.RedisUtil;
 import lombok.RequiredArgsConstructor;
 import org.modelmapper.ModelMapper;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -22,16 +33,20 @@ public class JobService {
     private final CategoryService categoryService;
     private final FileStorageClient fileStorageClient;
     private final ModelMapper modelMapper;
+    private final RedisUtil redisUtil;
+    private final RedissonClient redissonClient;
 
+    @Transactional
     public Job createJob(JobCreateRequest request, MultipartFile file) {
         Category category = categoryService.getCategoryById(request.getCategoryId());
 
         String imageId = null;
 
-        if (file != null)
+        if (file != null) {
             imageId = fileStorageClient.uploadImageToFIleSystem(file).getBody();
+        }
 
-        return jobRepository.save(Job.builder()
+        return saveOrUpdateCategory(Job.builder()
                 .name(request.getName())
                 .description(request.getDescription())
                 .category(category)
@@ -49,22 +64,35 @@ public class JobService {
         return findJobById(id);
     }
 
+    @Transactional
     public Job updateJob(JobUpdateRequest request, MultipartFile file) {
-        Job toUpdate = findJobById(request.getCategoryId());
-        modelMapper.map(request, toUpdate);
+        RLock lock = redissonClient.getLock("update:" + getJobCacheId(request.getId()));
+        if (!lock.tryLock()) {
+            try {
+                redisUtil.delete(getJobCacheId(request.getId()));
 
-        if (file != null) {
-            String imageId = fileStorageClient.uploadImageToFIleSystem(file).getBody();
-            if (imageId != null) {
-                fileStorageClient.deleteImageFromFileSystem(toUpdate.getImageId());
-                toUpdate.setImageId(imageId);
+                Job toUpdate = findJobById(request.getCategoryId(), false);
+                modelMapper.map(request, toUpdate);
+
+                if (file != null) {
+                    String imageId = fileStorageClient.uploadImageToFIleSystem(file).getBody();
+                    if (imageId != null) {
+                        fileStorageClient.deleteImageFromFileSystem(toUpdate.getImageId());
+                        toUpdate.setImageId(imageId);
+                    }
+                }
+
+                return saveOrUpdateCategory(toUpdate);
+            } finally {
+                lock.unlock();
             }
+        } else {
+            throw new RuntimeException("Concurrent Job Update!!! job-id: %s".formatted(request.getId()));
         }
-
-        return jobRepository.save(toUpdate);
     }
 
     public void deleteJobById(String id) {
+        redisUtil.delete(getJobCacheId(id));
         jobRepository.deleteById(id);
     }
 
@@ -80,7 +108,9 @@ public class JobService {
                     if (map.containsKey(job.getId())) {
                         int count = map.get(job.getId());
                         map.put(job.getId(), count + 1);
-                    } else map.put(job.getId(), 1);
+                    } else {
+                        map.put(job.getId(), 1);
+                    }
                 }));
         return map.entrySet().stream()
                 .sorted(Map.Entry.comparingByValue(Comparator.reverseOrder()))
@@ -89,7 +119,27 @@ public class JobService {
     }
 
     protected Job findJobById(String id) {
+        return findJobById(id, true);
+    }
+
+    protected Job findJobById(String id, boolean useCache) {
+        if (useCache) {
+            Job jobCache = redisUtil.findObject(getJobCacheId(id), Job.class);
+            if (jobCache != null) {
+                return jobCache;
+            }
+        }
         return jobRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Job not found"));
+    }
+
+    private Job saveOrUpdateCategory(Job job) {
+        Job savedJob = jobRepository.save(job);
+        redisUtil.saveObject(getJobCacheId(savedJob.getId()), savedJob);
+        return savedJob;
+    }
+
+    private String getJobCacheId(String id) {
+        return "job:" + id;
     }
 }

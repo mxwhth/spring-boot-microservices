@@ -20,7 +20,7 @@ services:
 
   zookeeper:
     container_name: zookeeper
-    image: "docker.io/bitnami/zookeeper:3"
+    image: bitnami/zookeeper:latest
     ports:
       - "2181:2181"
     volumes:
@@ -36,7 +36,7 @@ services:
 
   kafka:
     container_name: kafka
-    image: "docker.io/bitnami/kafka:2-debian-10"
+    image: bitnami/kafka:3.3.2
     ports:
       - "9092:9092"
     expose:
@@ -46,7 +46,7 @@ services:
     environment:
       - KAFKA_CFG_ZOOKEEPER_CONNECT=zookeeper:2181
       - ALLOW_PLAINTEXT_LISTENER=yes
-      - KAFKA_ADVERTISED_LISTENERS=INSIDE://kafka:9093,OUTSIDE://localhost:9092
+      - KAFKA_ADVERTISED_LISTENERS=INSIDE://kafka:9093,OUTSIDE://kafka:9092
       - KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=INSIDE:PLAINTEXT,OUTSIDE:PLAINTEXT
       - KAFKA_LISTENERS=INSIDE://0.0.0.0:9093,OUTSIDE://0.0.0.0:9092
       - KAFKA_INTER_BROKER_LISTENER_NAME=INSIDE
@@ -67,8 +67,10 @@ services:
     restart: always
     environment:
       - KAFKA_CLUSTERS_0_NAME=local
-      - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka:9093
-      - KAFKA_CLUSTERS_0_ZOOKEEPER=localhost:2181
+      - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka:9092
+      - KAFKA_CLUSTERS_0_ZOOKEEPER=zookeeper:2181
+    depends_on:
+      - kafka
 
   redis:
     container_name: redis
@@ -111,10 +113,14 @@ services:
 #    environment:
 #      - discovery.type=single-node
 #      - xpack.security.enabled=false
+#      - ES_JAVA_OPTS=-Xms512m -Xmx512m
 #    ports:
 #      - "9200:9200"
+#    volumes:
+#      - es_data:/usr/share/elasticsearch/data
 #    networks:
 #      - elk
+#    platform: linux/amd64
 #    healthcheck:
 #      test: [ "CMD-SHELL", "curl -s http://localhost:9200/_cluster/health | grep -q '\"status\"'" ]
 #      interval: 10s
@@ -134,7 +140,7 @@ services:
 #    networks:
 #      - elk
 #    healthcheck:
-#      test: [ "CMD-SHELL", "curl -s http://localhost:5601/api/status | grep -q '\"state\":\"green\"'" ]
+#      test: ["CMD-SHELL", "curl -s http://localhost:5601/api/status | grep -q '\"state\":\"green\"\\|\"state\":\"available\"'"]
 #      interval: 10s
 #      timeout: 5s
 #      retries: 10
@@ -143,7 +149,7 @@ services:
 #    image: docker.elastic.co/logstash/logstash:8.13.4
 #    container_name: logstash
 #    volumes:
-#      - ./logstash/logstash.conf:/usr/share/logstash/pipeline/logstash.conf:ro
+#      - ./logstash/logstash.conf:/usr/share/logstash/pipeline/logstash.conf
 #    depends_on:
 #      elasticsearch:
 #        condition: service_healthy
@@ -151,6 +157,11 @@ services:
 #      - elk
 #    ports:
 #      - "5044:5044"
+#      - "5000:5000/tcp"
+#      - "5000:5000/udp"
+#    environment:
+#      - xpack.monitoring.enabled=false
+#    platform: linux/amd64
 #    healthcheck:
 #      test: [ "CMD", "nc", "-z", "localhost", "5044" ]
 #      interval: 10s
@@ -163,7 +174,13 @@ services:
 #    user: root
 #    volumes:
 #      - ./filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
-#      - ./log:/logs:ro        # 映射你的本地日志目录到容器内
+##      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+##      - /var/run/docker.sock:/var/run/docker.sock:ro
+#      - ./logs:/logs:ro        # 映射你的本地日志目录到容器内
+#    environment:
+#      - setup.kibana.host=kibana:5601
+#      - output.logstash.enabled=true
+#    command: ["filebeat", "-e", "-strict.perms=false"]
 #    depends_on:
 #      - logstash
 #    networks:
@@ -178,8 +195,12 @@ volumes:
     driver: local
   redis_data:
     driver: local
+  es_data:
+    driver: local
 
 
 networks:
   elk:
     driver: bridge
+
+## colima start --cpu 4 --memory 4

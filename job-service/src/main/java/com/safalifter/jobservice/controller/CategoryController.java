@@ -33,6 +33,7 @@ public class CategoryController {
 
     @GetMapping("/getAll")
     ResponseEntity<List<CategoryDto>> getAll() {
+        // todo 限流
         return ResponseEntity.ok(categoryService.getAll().stream()
                 .map(category -> modelMapper.map(category, CategoryDto.class)).toList());
     }
