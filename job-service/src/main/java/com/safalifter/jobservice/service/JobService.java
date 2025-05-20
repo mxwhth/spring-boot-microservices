@@ -7,12 +7,13 @@ import com.safalifter.jobservice.model.Job;
 import com.safalifter.jobservice.repository.JobRepository;
 import com.safalifter.jobservice.request.job.JobCreateRequest;
 import com.safalifter.jobservice.request.job.JobUpdateRequest;
+import com.safalifter.jobservice.transaction.ClearCacheAfterTransactionEvent;
 import com.safalifter.jobservice.utils.RedisUtil;
 import lombok.RequiredArgsConstructor;
 import org.modelmapper.ModelMapper;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -35,6 +36,7 @@ public class JobService {
     private final ModelMapper modelMapper;
     private final RedisUtil redisUtil;
     private final RedissonClient redissonClient;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public Job createJob(JobCreateRequest request, MultipartFile file) {
@@ -91,9 +93,10 @@ public class JobService {
         }
     }
 
+    @Transactional
     public void deleteJobById(String id) {
-        redisUtil.delete(getJobCacheId(id));
         jobRepository.deleteById(id);
+        eventPublisher.publishEvent(new ClearCacheAfterTransactionEvent(getJobCacheId(id)));
     }
 
     public List<Job> getJobsByCategoryId(String id) {
@@ -135,7 +138,8 @@ public class JobService {
 
     private Job saveOrUpdateCategory(Job job) {
         Job savedJob = jobRepository.save(job);
-        redisUtil.saveObject(getJobCacheId(savedJob.getId()), savedJob);
+//        redisUtil.saveObject(getJobCacheId(savedJob.getId()), savedJob);
+        eventPublisher.publishEvent(new ClearCacheAfterTransactionEvent(getJobCacheId(savedJob.getId())));
         return savedJob;
     }
 

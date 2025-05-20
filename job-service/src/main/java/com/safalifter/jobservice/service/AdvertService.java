@@ -7,13 +7,18 @@ import com.safalifter.jobservice.enums.AdvertStatus;
 import com.safalifter.jobservice.enums.Advertiser;
 import com.safalifter.jobservice.exc.NotFoundException;
 import com.safalifter.jobservice.model.Advert;
+import com.safalifter.jobservice.model.Category;
 import com.safalifter.jobservice.model.Job;
 import com.safalifter.jobservice.repository.AdvertRepository;
 import com.safalifter.jobservice.request.advert.AdvertCreateRequest;
 import com.safalifter.jobservice.request.advert.AdvertUpdateRequest;
+import com.safalifter.jobservice.transaction.ClearCacheAfterTransactionEvent;
+import com.safalifter.jobservice.utils.RedisUtil;
 import lombok.RequiredArgsConstructor;
 import org.modelmapper.ModelMapper;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
@@ -27,7 +32,10 @@ public class AdvertService {
     private final UserServiceClient userServiceclient;
     private final FileStorageClient fileStorageClient;
     private final ModelMapper modelMapper;
+    private final RedisUtil redisUtil;
+    private final ApplicationEventPublisher eventPublisher;
 
+    @Transactional
     public Advert createAdvert(AdvertCreateRequest request, MultipartFile file) {
         String userId = getUserById(request.getUserId()).getId();
         Job job = jobService.getJobById(request.getJobId());
@@ -48,7 +56,7 @@ public class AdvertService {
                 .status(AdvertStatus.OPEN)
                 .imageId(imageId)
                 .build();
-        return advertRepository.save(toSave);
+        return saveOrUpdateAdvert(toSave);
     }
 
     public List<Advert> getAll() {
@@ -56,7 +64,7 @@ public class AdvertService {
     }
 
     public Advert getAdvertById(String id) {
-        return findAdvertById(id);
+        return findAdvertById(id, true);
     }
 
     public List<Advert> getAdvertsByUserId(String id, Advertiser type) {
@@ -69,8 +77,10 @@ public class AdvertService {
                 .orElseThrow(() -> new NotFoundException("User not found"));
     }
 
+    @Transactional
     public Advert updateAdvertById(AdvertUpdateRequest request, MultipartFile file) {
-        Advert toUpdate = findAdvertById(request.getId());
+        redisUtil.delete(getAdvertId(request.getId()));
+        Advert toUpdate = findAdvertById(request.getId(), false);
         modelMapper.map(request, toUpdate);
 
         if (file != null) {
@@ -81,19 +91,41 @@ public class AdvertService {
             }
         }
 
-        return advertRepository.save(toUpdate);
+        return saveOrUpdateAdvert(toUpdate);
     }
 
+    @Transactional
     public void deleteAdvertById(String id) {
         advertRepository.deleteById(id);
+        eventPublisher.publishEvent(new ClearCacheAfterTransactionEvent(getAdvertId(id)));
     }
 
     public boolean authorizeCheck(String id, String principal) {
         return getUserById(getAdvertById(id).getUserId()).getUsername().equals(principal);
     }
 
-    protected Advert findAdvertById(String id) {
-        return advertRepository.findById(id)
+    protected Advert findAdvertById(String id, boolean useCache) {
+        if (useCache) {
+            Advert advertCache = redisUtil.findObject(getAdvertId(id), Advert.class);
+            if (advertCache != null) {
+                return advertCache;
+            }
+        }
+
+        Advert advert = advertRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Advert not found"));
+        redisUtil.saveObject(getAdvertId(id), advert);
+        return advert;
+    }
+
+    private String getAdvertId(String id) {
+        return "advert:" + id;
+    }
+
+    private Advert saveOrUpdateAdvert(Advert advert) {
+        Advert savedAdvert =  advertRepository.save(advert);
+//        redisUtil.saveObject(getAdvertId(savedAdvert.getId()), savedAdvert);
+        eventPublisher.publishEvent(new ClearCacheAfterTransactionEvent(getAdvertId(savedAdvert.getId())));
+        return savedAdvert;
     }
 }

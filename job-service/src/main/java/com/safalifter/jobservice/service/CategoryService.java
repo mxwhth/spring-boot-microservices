@@ -6,9 +6,11 @@ import com.safalifter.jobservice.model.Category;
 import com.safalifter.jobservice.repository.CategoryRepository;
 import com.safalifter.jobservice.request.category.CategoryCreateRequest;
 import com.safalifter.jobservice.request.category.CategoryUpdateRequest;
+import com.safalifter.jobservice.transaction.ClearCacheAfterTransactionEvent;
 import com.safalifter.jobservice.utils.RedisUtil;
 import lombok.RequiredArgsConstructor;
 import org.modelmapper.ModelMapper;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,6 +25,7 @@ public class CategoryService {
     private final FileStorageClient fileStorageClient;
     private final ModelMapper modelMapper;
     private final RedisUtil redisUtil;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public Category createCategory(CategoryCreateRequest request, MultipartFile file) {
@@ -64,9 +67,10 @@ public class CategoryService {
         return saveOrUpdateCategory(toUpdate);
     }
 
+    @Transactional
     public void deleteCategoryById(String id) {
-        redisUtil.delete(getCategoryCacheId(id));
         categoryRepository.deleteById(id);
+        eventPublisher.publishEvent(new ClearCacheAfterTransactionEvent(getCategoryCacheId(id)));
     }
 
     protected Category findCategoryById(String id) {
@@ -92,7 +96,8 @@ public class CategoryService {
 
     private Category saveOrUpdateCategory(Category category) {
         Category savedCategory =  categoryRepository.save(category);
-        redisUtil.saveObject(getCategoryCacheId(savedCategory.getId()), savedCategory);
+//        redisUtil.saveObject(getCategoryCacheId(savedCategory.getId()), savedCategory);
+        eventPublisher.publishEvent(new ClearCacheAfterTransactionEvent(getCategoryCacheId(savedCategory.getId())));
         return savedCategory;
     }
 }
