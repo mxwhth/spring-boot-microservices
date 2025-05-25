@@ -4,9 +4,63 @@
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 
 <mapper namespace="com.safalifter.jobservice.mapper.AdvertMapper">
+    <resultMap id="AdvertResultMap" type="com.safalifter.jobservice.po.AdvertPO">
+        <id property="id" column="id" />
+        <result property="userId" column="user_id"/>
+        <result property="name" column="name"/>
+        <result property="description" column="description"/>
+        <result property="deliveryTime" column="delivery_time"/>
+        <result property="price" column="price"/>
+        <result property="imageId" column="image_id"/>
+        <result property="status" column="status" javaType="com.safalifter.jobservice.enums.AdvertStatus"/>
+        <result property="advertiser" column="advertiser" javaType="com.safalifter.jobservice.enums.Advertiser"/>
+        <result property="jobId" column="job_id"/>
+        <result property="creationTimestamp" column="creation_timestamp"/>
+        <result property="updateTimestamp" column="update_timestamp"/>
+    </resultMap>
 
-    <select id="getAdvertsByUserIdAndAdvertiser" resultType="com.safalifter.jobservice.model.Advert">
-        SELECT * FROM users WHERE id = #{id}
+    <select id="getAdvertsByUserIdAndAdvertiser" resultMap="AdvertResultMap">
+        SELECT * FROM adverts
+        WHERE user_id = #{userId}
+          AND advertiser = #{advertiser}
     </select>
+
+    <select id="findById" resultMap="AdvertResultMap">
+        SELECT * FROM adverts WHERE id = #{id}
+    </select>
+
+    <select id="findAll" resultMap="AdvertResultMap">
+        SELECT * FROM adverts
+    </select>
+
+    <insert id="save" parameterType="com.safalifter.jobservice.po.AdvertPO">
+        INSERT INTO adverts (
+            id, user_id, name, description, delivery_time, price,
+            image_id, status, advertiser, job_id, creation_timestamp, update_timestamp
+        ) VALUES (
+                     #{id}, #{userId}, #{name}, #{description}, #{deliveryTime}, #{price},
+                     #{imageId}, #{status}, #{advertiser}, #{jobId}, #{creationTimestamp}, #{updateTimestamp}
+                 )
+    </insert>
+
+    <update id="update" parameterType="com.safalifter.jobservice.po.AdvertPO">
+        UPDATE adverts
+        SET
+            user_id = #{userId},
+            name = #{name},
+            description = #{description},
+            delivery_time = #{deliveryTime},
+            price = #{price},
+            image_id = #{imageId},
+            status = #{status},
+            advertiser = #{advertiser},
+            job_id = #{jobId},
+            update_timestamp = #{updateTimestamp}
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteById">
+        DELETE FROM adverts WHERE id = #{id}
+    </delete>
 
 </mapper>

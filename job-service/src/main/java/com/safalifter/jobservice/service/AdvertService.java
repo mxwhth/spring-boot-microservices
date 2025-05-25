@@ -6,6 +6,7 @@ import com.safalifter.jobservice.dto.UserDto;
 import com.safalifter.jobservice.enums.AdvertStatus;
 import com.safalifter.jobservice.enums.Advertiser;
 import com.safalifter.jobservice.exc.NotFoundException;
+import com.safalifter.jobservice.mapper.AdvertMapper;
 import com.safalifter.jobservice.model.Advert;
 import com.safalifter.jobservice.model.Category;
 import com.safalifter.jobservice.model.Job;
@@ -41,6 +42,7 @@ public class AdvertService {
     private final RedisUtil redisUtil;
     private final ApplicationEventPublisher eventPublisher;
     private final JobRepository jobRepository;
+    private final AdvertMapper advertMapper;
 
     @Transactional
     public Advert createAdvert(AdvertCreateRequest request, MultipartFile file) {
@@ -68,7 +70,7 @@ public class AdvertService {
     }
 
     public List<Advert> getAll() {
-        var advertPoList = advertRepository.findAll();
+        var advertPoList = advertMapper.findAll();
         var jobMap = jobRepository.findAllById(
                 advertPoList.stream()
                         .map(AdvertPO::getJobId).distinct().toList()
@@ -86,7 +88,7 @@ public class AdvertService {
 
     public List<Advert> getAdvertsByUserId(String id, Advertiser type) {
         String userId = getUserById(id).getId();
-        return advertRepository.getAdvertsByUserIdAndAdvertiser(userId, type).stream()
+        return advertMapper.getAdvertsByUserIdAndAdvertiser(userId, type).stream()
                 .map(po -> modelMapper.map(po, Advert.class))
                 .collect(Collectors.toList());
     }
@@ -115,7 +117,7 @@ public class AdvertService {
 
     @Transactional
     public void deleteAdvertById(String id) {
-        advertRepository.deleteById(id);
+        advertMapper.deleteById(id);
         eventPublisher.publishEvent(new ClearCacheAfterTransactionEvent(getAdvertId(id)));
     }
 
@@ -131,7 +133,7 @@ public class AdvertService {
             }
         }
 
-        Advert advert = advertRepository.findById(id)
+        Advert advert = Optional.ofNullable(advertMapper.findById(id))
                 .map(po -> modelMapper.map(po, Advert.class))
                 .orElseThrow(() -> new NotFoundException("Advert not found"));
         redisUtil.saveObject(getAdvertId(id), advert);
@@ -143,7 +145,12 @@ public class AdvertService {
     }
 
     private Advert saveOrUpdateAdvert(Advert advert) {
-        AdvertPO savedAdvert = advertRepository.save(modelMapper.map(advert, AdvertPO.class));
+        AdvertPO savedAdvert;
+        if (advert.getId() == null) {
+            savedAdvert = advertMapper.save(modelMapper.map(advert, AdvertPO.class));
+        }else {
+            savedAdvert = advertMapper.update(modelMapper.map(advert, AdvertPO.class));
+        }
 //        redisUtil.saveObject(getAdvertId(savedAdvert.getId()), savedAdvert);
         eventPublisher.publishEvent(new ClearCacheAfterTransactionEvent(getAdvertId(savedAdvert.getId())));
         return modelMapper.map(savedAdvert, Advert.class);
