@@ -3,7 +3,11 @@ package com.safalifter.jobservice.service;
 import com.safalifter.jobservice.client.FileStorageClient;
 import com.safalifter.jobservice.exc.NotFoundException;
 import com.safalifter.jobservice.model.Category;
+import com.safalifter.jobservice.model.Job;
+import com.safalifter.jobservice.po.CategoryPO;
+import com.safalifter.jobservice.po.JobPO;
 import com.safalifter.jobservice.repository.CategoryRepository;
+import com.safalifter.jobservice.repository.JobRepository;
 import com.safalifter.jobservice.request.category.CategoryCreateRequest;
 import com.safalifter.jobservice.request.category.CategoryUpdateRequest;
 import com.safalifter.jobservice.transaction.ClearCacheAfterTransactionEvent;
@@ -17,6 +21,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
+import java.util.stream.Collector;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -26,6 +32,7 @@ public class CategoryService {
     private final ModelMapper modelMapper;
     private final RedisUtil redisUtil;
     private final ApplicationEventPublisher eventPublisher;
+    private final JobRepository jobRepository;
 
     @Transactional
     public Category createCategory(CategoryCreateRequest request, MultipartFile file) {
@@ -42,7 +49,12 @@ public class CategoryService {
     }
 
     public List<Category> getAll() {
-        return categoryRepository.findAll();
+        var categories = categoryRepository.findAll();
+        if (categories.isEmpty()) {
+            return List.of();
+        }
+
+        return categories.stream().map(po -> modelMapper.map(po, Category.class)).collect(Collectors.toList());
     }
 
     public Category getCategoryById(String id) {
@@ -85,6 +97,7 @@ public class CategoryService {
             }
         }
         Category category = categoryRepository.findById(id)
+                .map(po -> modelMapper.map(po, Category.class))
                 .orElseThrow(() -> new NotFoundException("Category not found"));
         redisUtil.saveObject(getCategoryCacheId(id), category);
         return category;
@@ -95,9 +108,9 @@ public class CategoryService {
     }
 
     private Category saveOrUpdateCategory(Category category) {
-        Category savedCategory =  categoryRepository.save(category);
+        CategoryPO savedCategoryPO =  categoryRepository.save(modelMapper.map(category, CategoryPO.class));
 //        redisUtil.saveObject(getCategoryCacheId(savedCategory.getId()), savedCategory);
-        eventPublisher.publishEvent(new ClearCacheAfterTransactionEvent(getCategoryCacheId(savedCategory.getId())));
-        return savedCategory;
+        eventPublisher.publishEvent(new ClearCacheAfterTransactionEvent(getCategoryCacheId(savedCategoryPO.getId())));
+        return modelMapper.map(savedCategoryPO, Category.class);
     }
 }

@@ -5,7 +5,6 @@ import lombok.*;
 
 import javax.persistence.*;
 
-@Entity(name = "offers")
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
@@ -18,7 +17,5 @@ public class Offer extends BaseEntity {
     @Enumerated(EnumType.STRING)
     private OfferStatus status;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "advert_id")
     private Advert advert;
 }

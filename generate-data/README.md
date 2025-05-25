@@ -28,12 +28,12 @@ Simple Python script to generate lots of data for testing.
 ## Running the Script
 
 ```bash
-python generate_data.py --host localhost --user yourUser --password yourPassword --database yourDatabase --port yourPort
+python generateData.py --host localhost --user yourUser --password yourPassword --database yourDatabase --port yourPort
 ```
 
 ### By default
 ```bash
-python generate_data.py
+python generateData.py
 ```
 
 ## Exit the virtual environment

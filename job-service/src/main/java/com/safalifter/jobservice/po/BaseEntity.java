@@ -1,4 +1,4 @@
-package com.safalifter.jobservice.model;
+package com.safalifter.jobservice.po;
 
 
 import lombok.Getter;
@@ -15,9 +15,14 @@ import java.time.LocalDateTime;
 @MappedSuperclass
 @Getter
 public abstract class BaseEntity implements Serializable {
+    @Id
+    @GeneratedValue(generator = "UUID")
+    @GenericGenerator(name = "UUID", strategy = "org.hibernate.id.UUIDGenerator")
     private String id;
 
+    @CreationTimestamp
     private LocalDateTime creationTimestamp;
 
+    @UpdateTimestamp
     private LocalDateTime updateTimestamp;
 }

@@ -18,6 +18,6 @@ public class AdvertDto {
     private AdvertStatus status;
     private Advertiser advertiser;
     private String userId;
-    private String jobId;
+    private JobDto job;
     private List<String> imagesId;
 }

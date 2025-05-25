@@ -9,7 +9,7 @@ import lombok.Data;
 public class OfferDto {
     private String id;
     private String userId;
-    private String advertId;
+    private AdvertDto advert;
     private int offeredPrice;
     private OfferStatus status;
 }

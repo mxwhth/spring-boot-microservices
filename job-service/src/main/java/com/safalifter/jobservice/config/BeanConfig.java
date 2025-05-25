@@ -18,8 +18,10 @@ public class BeanConfig {
     public ModelMapper getModelMapper() {
         ModelMapper modelMapper = new ModelMapper();
         modelMapper.getConfiguration()
-                .setMatchingStrategy(MatchingStrategies.LOOSE)
-                .setPropertyCondition(Conditions.isNotNull());
+//                .setMatchingStrategy(MatchingStrategies.LOOSE)
+                .setPropertyCondition(Conditions.isNotNull())
+                .setFieldMatchingEnabled(true)
+                .setFieldAccessLevel(org.modelmapper.config.Configuration.AccessLevel.PRIVATE);
         return modelMapper;
     }
 

@@ -7,7 +7,6 @@ import lombok.*;
 import javax.persistence.*;
 import java.util.List;
 
-@Entity(name = "adverts")
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
@@ -27,10 +26,5 @@ public class Advert extends BaseEntity {
     @Enumerated(EnumType.STRING)
     private Advertiser advertiser;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "job_id")
     private Job job;
-
-    @OneToMany(mappedBy = "advert", cascade = CascadeType.ALL)
-    private List<Offer> offers;
 }

@@ -9,7 +9,11 @@ import com.safalifter.jobservice.exc.NotFoundException;
 import com.safalifter.jobservice.model.Advert;
 import com.safalifter.jobservice.model.Category;
 import com.safalifter.jobservice.model.Job;
+import com.safalifter.jobservice.po.AdvertPO;
+import com.safalifter.jobservice.po.JobPO;
 import com.safalifter.jobservice.repository.AdvertRepository;
+import com.safalifter.jobservice.repository.CategoryRepository;
+import com.safalifter.jobservice.repository.JobRepository;
 import com.safalifter.jobservice.request.advert.AdvertCreateRequest;
 import com.safalifter.jobservice.request.advert.AdvertUpdateRequest;
 import com.safalifter.jobservice.transaction.ClearCacheAfterTransactionEvent;
@@ -23,6 +27,8 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -34,6 +40,7 @@ public class AdvertService {
     private final ModelMapper modelMapper;
     private final RedisUtil redisUtil;
     private final ApplicationEventPublisher eventPublisher;
+    private final JobRepository jobRepository;
 
     @Transactional
     public Advert createAdvert(AdvertCreateRequest request, MultipartFile file) {
@@ -42,8 +49,9 @@ public class AdvertService {
 
         String imageId = null;
 
-        if (file != null)
+        if (file != null) {
             imageId = fileStorageClient.uploadImageToFIleSystem(file).getBody();
+        }
 
         Advert toSave = Advert.builder()
                 .userId(userId)
@@ -60,7 +68,16 @@ public class AdvertService {
     }
 
     public List<Advert> getAll() {
-        return advertRepository.findAll();
+        var advertPoList = advertRepository.findAll();
+        var jobMap = jobRepository.findAllById(
+                advertPoList.stream()
+                        .map(AdvertPO::getJobId).distinct().toList()
+        ).stream().map(po -> modelMapper.map(po, Job.class)).collect(Collectors.toMap(Job::getId, Function.identity()));
+        return advertPoList.stream().map(po -> {
+            Advert advert = modelMapper.map(po, Advert.class);
+            advert.setJob(jobMap.get(po.getJobId()));
+            return advert;
+        }).collect(Collectors.toList());
     }
 
     public Advert getAdvertById(String id) {
@@ -69,7 +86,9 @@ public class AdvertService {
 
     public List<Advert> getAdvertsByUserId(String id, Advertiser type) {
         String userId = getUserById(id).getId();
-        return advertRepository.getAdvertsByUserIdAndAdvertiser(userId, type);
+        return advertRepository.getAdvertsByUserIdAndAdvertiser(userId, type).stream()
+                .map(po -> modelMapper.map(po, Advert.class))
+                .collect(Collectors.toList());
     }
 
     public UserDto getUserById(String id) {
@@ -113,6 +132,7 @@ public class AdvertService {
         }
 
         Advert advert = advertRepository.findById(id)
+                .map(po -> modelMapper.map(po, Advert.class))
                 .orElseThrow(() -> new NotFoundException("Advert not found"));
         redisUtil.saveObject(getAdvertId(id), advert);
         return advert;
@@ -123,9 +143,9 @@ public class AdvertService {
     }
 
     private Advert saveOrUpdateAdvert(Advert advert) {
-        Advert savedAdvert =  advertRepository.save(advert);
+        AdvertPO savedAdvert = advertRepository.save(modelMapper.map(advert, AdvertPO.class));
 //        redisUtil.saveObject(getAdvertId(savedAdvert.getId()), savedAdvert);
         eventPublisher.publishEvent(new ClearCacheAfterTransactionEvent(getAdvertId(savedAdvert.getId())));
-        return savedAdvert;
+        return modelMapper.map(savedAdvert, Advert.class);
     }
 }

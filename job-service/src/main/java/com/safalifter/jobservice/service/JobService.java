@@ -4,6 +4,9 @@ import com.safalifter.jobservice.client.FileStorageClient;
 import com.safalifter.jobservice.exc.NotFoundException;
 import com.safalifter.jobservice.model.Category;
 import com.safalifter.jobservice.model.Job;
+import com.safalifter.jobservice.po.CategoryPO;
+import com.safalifter.jobservice.po.JobPO;
+import com.safalifter.jobservice.repository.CategoryRepository;
 import com.safalifter.jobservice.repository.JobRepository;
 import com.safalifter.jobservice.request.job.JobCreateRequest;
 import com.safalifter.jobservice.request.job.JobUpdateRequest;
@@ -25,6 +28,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
@@ -37,6 +41,7 @@ public class JobService {
     private final RedisUtil redisUtil;
     private final RedissonClient redissonClient;
     private final ApplicationEventPublisher eventPublisher;
+    private final CategoryRepository categoryRepository;
 
     @Transactional
     public Job createJob(JobCreateRequest request, MultipartFile file) {
@@ -59,7 +64,20 @@ public class JobService {
     }
 
     public List<Job> getAll() {
-        return jobRepository.findAll();
+        var jobPoList = jobRepository.findAll();
+        var categoryMap =
+                categoryRepository.findAllById(jobPoList.stream().map(JobPO::getCategoryId).distinct().toList())
+                        .stream()
+                        .map(categoryPO -> modelMapper.map(categoryPO, Category.class))
+                        .collect(Collectors.toMap(Category::getId, Function.identity()));
+
+        return jobPoList.stream()
+                .map(jobPo -> {
+                    Job job = modelMapper.map(jobPo, Job.class);
+                    job.setCategory(categoryMap.get(jobPo.getCategoryId()));
+                    return job;
+                })
+                .collect(Collectors.toList());
     }
 
     public Job getJobById(String id) {
@@ -99,8 +117,14 @@ public class JobService {
         eventPublisher.publishEvent(new ClearCacheAfterTransactionEvent(getJobCacheId(id)));
     }
 
-    public List<Job> getJobsByCategoryId(String id) {
-        return jobRepository.getJobsByCategoryId(id);
+    public List<Job> getJobsByCategoryId(String categoryId) {
+        Category category = categoryRepository.findById(categoryId)
+                .map(po -> modelMapper.map(po, Category.class))
+                .orElseThrow(() -> new NotFoundException("Category not found"));
+        return jobRepository.getJobsByCategoryId(categoryId).stream()
+                .map(po -> modelMapper.map(po, Job.class))
+                .peek(job -> job.setCategory(category))
+                .collect(Collectors.toList());
     }
 
     public List<Job> getJobsThatFitYourNeeds(String needs) {
@@ -132,15 +156,18 @@ public class JobService {
                 return jobCache;
             }
         }
-        return jobRepository.findById(id)
+        Job job = jobRepository.findById(id)
+                .map(po -> modelMapper.map(po, Job.class))
                 .orElseThrow(() -> new NotFoundException("Job not found"));
+        redisUtil.saveObject(getJobCacheId(id), job);
+        return job;
     }
 
     private Job saveOrUpdateCategory(Job job) {
-        Job savedJob = jobRepository.save(job);
+        JobPO savedJob = jobRepository.save(modelMapper.map(job, JobPO.class));
 //        redisUtil.saveObject(getJobCacheId(savedJob.getId()), savedJob);
         eventPublisher.publishEvent(new ClearCacheAfterTransactionEvent(getJobCacheId(savedJob.getId())));
-        return savedJob;
+        return modelMapper.map(savedJob, Job.class);
     }
 
     private String getJobCacheId(String id) {

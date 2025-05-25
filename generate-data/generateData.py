@@ -76,6 +76,21 @@ def insert_jobs(cursor, db, category_ids, n=1000000):
     db.commit()
     return job_ids
 
+def insert_job_keys(cursor, db, job_ids, keys_per_job=3):
+    print("Generating job_keys...")
+    job_keys = []
+    for job_id in tqdm(job_ids, desc="Job Keys"):
+        for _ in range(random.randint(1, keys_per_job)):
+            job_keys.append((job_id, fake.word()))
+        if len(job_keys) % 10000 == 0:
+            cursor.executemany("INSERT INTO job_keys (job_id, key) VALUES (%s, %s)", job_keys)
+            db.commit()
+            job_keys = []
+    if job_keys:
+        cursor.executemany("INSERT INTO job_keys (job_id, key) VALUES (%s, %s)", job_keys)
+        db.commit()
+
+
 def insert_adverts(cursor, db, user_ids, job_ids, n=1000000):
     print("Generating adverts...")
     advert_ids = []
@@ -87,9 +102,9 @@ def insert_adverts(cursor, db, user_ids, job_ids, n=1000000):
                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                        """, (
                            advert_id, datetime.now(), datetime.now(),
-                           fake.company(), random.randint(1, 30),
+                           random.choice(['EMPLOYEE', 'CUSTOMER']), random.randint(1, 30),
                            fake.text(100), None, fake.catch_phrase(), random.randint(50, 1000),
-                           random.choice(['ACTIVE', 'INACTIVE']),
+                           random.choice(['OPEN', 'CLOSED', 'CANCELLED', 'ASSIGNED', 'REVIEWED']),
                            random.choice(user_ids), random.choice(job_ids)
                        ))
         advert_ids.append(advert_id)
@@ -108,7 +123,7 @@ def insert_offers(cursor, db, user_ids, advert_ids, n=500000):
                        VALUES (%s, %s, %s, %s, %s, %s, %s)
                        """, (
                            offer_id, datetime.now(), datetime.now(),
-                           random.randint(50, 1000), random.choice(['PENDING', 'ACCEPTED', 'REJECTED']),
+                           random.randint(50, 1000), random.choice(['OPEN', 'CLOSED', 'ACCEPTED', 'REJECTED']),
                            random.choice(user_ids), random.choice(advert_ids)
                        ))
         offer_ids.append(offer_id)
@@ -147,6 +162,7 @@ def main():
     user_ids = insert_users(cursor, db, 100)
     category_ids = insert_categories(cursor, db, 300)
     job_ids = insert_jobs(cursor, db, category_ids, 1000)
+    insert_job_keys(cursor, db, job_ids, keys_per_job=5)
     advert_ids = insert_adverts(cursor, db, user_ids, job_ids, 1000)
     offer_ids = insert_offers(cursor, db, user_ids, advert_ids, 100)
     insert_notifications(cursor, db, offer_ids, user_ids, 100)
