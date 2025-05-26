@@ -7,11 +7,8 @@ import com.safalifter.jobservice.po.CategoryPO;
 import com.safalifter.jobservice.repository.CategoryRepository;
 import com.safalifter.jobservice.request.category.CategoryCreateRequest;
 import com.safalifter.jobservice.request.category.CategoryUpdateRequest;
-import com.safalifter.jobservice.transaction.ClearCacheAfterTransactionEvent;
-import com.safalifter.jobservice.utils.RedisUtil;
 import lombok.RequiredArgsConstructor;
 import org.modelmapper.ModelMapper;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -25,8 +22,6 @@ public class CategoryService {
     private final CategoryRepository categoryRepository;
     private final FileStorageClient fileStorageClient;
     private final ModelMapper modelMapper;
-    private final RedisUtil redisUtil;
-    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public Category createCategory(CategoryCreateRequest request, MultipartFile file) {
@@ -57,9 +52,7 @@ public class CategoryService {
 
     @Transactional
     public Category updateCategoryById(CategoryUpdateRequest request, MultipartFile file) {
-        redisUtil.delete(getCategoryCacheId(request.getId()));
-
-        Category toUpdate = findCategoryById(request.getId(), false);
+        Category toUpdate = findCategoryById(request.getId());
         modelMapper.map(request, toUpdate);
 
         if (file != null) {
@@ -76,25 +69,12 @@ public class CategoryService {
     @Transactional
     public void deleteCategoryById(String id) {
         categoryRepository.deleteById(id);
-        eventPublisher.publishEvent(new ClearCacheAfterTransactionEvent(getCategoryCacheId(id)));
     }
 
     protected Category findCategoryById(String id) {
-        return findCategoryById(id, true);
-    }
-
-    protected Category findCategoryById(String id, boolean useCache) {
-        if (useCache) {
-            Category categoryCache = redisUtil.findObject(getCategoryCacheId(id), Category.class);
-            if (categoryCache != null) {
-                return categoryCache;
-            }
-        }
-        Category category = categoryRepository.findById(id)
+        return categoryRepository.findById(id)
                 .map(po -> modelMapper.map(po, Category.class))
                 .orElseThrow(() -> new NotFoundException("Category not found"));
-        redisUtil.saveObject(getCategoryCacheId(id), category);
-        return category;
     }
 
     private String getCategoryCacheId(String id) {
@@ -103,8 +83,6 @@ public class CategoryService {
 
     private Category saveOrUpdateCategory(Category category) {
         CategoryPO savedCategoryPO =  categoryRepository.save(modelMapper.map(category, CategoryPO.class));
-//        redisUtil.saveObject(getCategoryCacheId(savedCategory.getId()), savedCategory);
-        eventPublisher.publishEvent(new ClearCacheAfterTransactionEvent(getCategoryCacheId(savedCategoryPO.getId())));
         return modelMapper.map(savedCategoryPO, Category.class);
     }
 }

@@ -13,12 +13,9 @@ import com.safalifter.jobservice.repository.OfferRepository;
 import com.safalifter.jobservice.request.notification.SendNotificationRequest;
 import com.safalifter.jobservice.request.offer.MakeAnOfferRequest;
 import com.safalifter.jobservice.request.offer.OfferUpdateRequest;
-import com.safalifter.jobservice.transaction.ClearCacheAfterTransactionEvent;
-import com.safalifter.jobservice.utils.RedisUtil;
 import lombok.RequiredArgsConstructor;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.modelmapper.ModelMapper;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,8 +33,6 @@ public class OfferService {
     private final KafkaTemplate<String, SendNotificationRequest> kafkaTemplate;
     private final NewTopic topic;
     private final ModelMapper modelMapper;
-    private final RedisUtil redisUtil;
-    private final ApplicationEventPublisher eventPublisher;
     private final AdvertRepository advertRepository;
 
     @Transactional
@@ -96,8 +91,7 @@ public class OfferService {
 
     @Transactional
     public Offer updateOfferById(OfferUpdateRequest request) {
-        redisUtil.delete(getOfferCacheId(request.getId()));
-        Offer toUpdate = findOfferById(request.getId(), false);
+        Offer toUpdate = findOfferById(request.getId());
         modelMapper.map(request, toUpdate);
         return saveOrUpdateCategory(toUpdate);
     }
@@ -105,7 +99,6 @@ public class OfferService {
     @Transactional
     public void deleteOfferById(String id) {
         offerRepository.deleteById(id);
-        eventPublisher.publishEvent(new ClearCacheAfterTransactionEvent(getOfferCacheId(id)));
     }
 
     public boolean authorizeCheck(String id, String principal) {
@@ -113,31 +106,13 @@ public class OfferService {
     }
 
     protected Offer findOfferById(String id) {
-        return findOfferById(id, true);
-    }
-
-    protected Offer findOfferById(String id, boolean useCache) {
-        if (useCache) {
-            Offer offerCache = redisUtil.findObject(getOfferCacheId(id), Offer.class);
-            if (offerCache != null) {
-                return offerCache;
-            }
-        }
-        Offer offer = offerRepository.findById(id)
+        return offerRepository.findById(id)
                 .map(po -> modelMapper.map(po, Offer.class))
                 .orElseThrow(() -> new NotFoundException("Offer not found"));
-        redisUtil.saveObject(getOfferCacheId(id), offer);
-        return offer;
     }
 
     private Offer saveOrUpdateCategory(Offer offer) {
         OfferPO savedOffer = offerRepository.save(modelMapper.map(offer, OfferPO.class));
-//        redisUtil.saveObject(getOfferCacheId(savedOffer.getId()), savedOffer);
-        eventPublisher.publishEvent(new ClearCacheAfterTransactionEvent(getOfferCacheId(savedOffer.getId())));
         return modelMapper.map(savedOffer, Offer.class);
-    }
-
-    private String getOfferCacheId(String id) {
-        return "offer:" + id;
     }
 }

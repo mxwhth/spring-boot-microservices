@@ -9,13 +9,8 @@ import com.safalifter.jobservice.repository.CategoryRepository;
 import com.safalifter.jobservice.repository.JobRepository;
 import com.safalifter.jobservice.request.job.JobCreateRequest;
 import com.safalifter.jobservice.request.job.JobUpdateRequest;
-import com.safalifter.jobservice.transaction.ClearCacheAfterTransactionEvent;
-import com.safalifter.jobservice.utils.RedisUtil;
 import lombok.RequiredArgsConstructor;
 import org.modelmapper.ModelMapper;
-import org.redisson.api.RLock;
-import org.redisson.api.RedissonClient;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -36,9 +31,6 @@ public class JobService {
     private final JobRepository jobRepository;
     private final FileStorageClient fileStorageClient;
     private final ModelMapper modelMapper;
-    private final RedisUtil redisUtil;
-    private final RedissonClient redissonClient;
-    private final ApplicationEventPublisher eventPublisher;
     private final CategoryRepository categoryRepository;
 
     @Transactional
@@ -86,35 +78,23 @@ public class JobService {
 
     @Transactional
     public Job updateJob(JobUpdateRequest request, MultipartFile file) {
-        RLock lock = redissonClient.getLock("update:" + getJobCacheId(request.getId()));
-        if (!lock.tryLock()) {
-            try {
-                redisUtil.delete(getJobCacheId(request.getId()));
+        Job toUpdate = findJobById(request.getCategoryId());
+        modelMapper.map(request, toUpdate);
 
-                Job toUpdate = findJobById(request.getCategoryId(), false);
-                modelMapper.map(request, toUpdate);
-
-                if (file != null) {
-                    String imageId = fileStorageClient.uploadImageToFIleSystem(file).getBody();
-                    if (imageId != null) {
-                        fileStorageClient.deleteImageFromFileSystem(toUpdate.getImageId());
-                        toUpdate.setImageId(imageId);
-                    }
-                }
-
-                return saveOrUpdateCategory(toUpdate);
-            } finally {
-                lock.unlock();
+        if (file != null) {
+            String imageId = fileStorageClient.uploadImageToFIleSystem(file).getBody();
+            if (imageId != null) {
+                fileStorageClient.deleteImageFromFileSystem(toUpdate.getImageId());
+                toUpdate.setImageId(imageId);
             }
-        } else {
-            throw new RuntimeException("Concurrent Job Update!!! job-id: %s".formatted(request.getId()));
         }
+
+        return saveOrUpdateCategory(toUpdate);
     }
 
     @Transactional
     public void deleteJobById(String id) {
         jobRepository.deleteById(id);
-        eventPublisher.publishEvent(new ClearCacheAfterTransactionEvent(getJobCacheId(id)));
     }
 
     public List<Job> getJobsByCategoryId(String categoryId) {
@@ -146,31 +126,13 @@ public class JobService {
     }
 
     protected Job findJobById(String id) {
-        return findJobById(id, true);
-    }
-
-    protected Job findJobById(String id, boolean useCache) {
-        if (useCache) {
-            Job jobCache = redisUtil.findObject(getJobCacheId(id), Job.class);
-            if (jobCache != null) {
-                return jobCache;
-            }
-        }
-        Job job = jobRepository.findById(id)
+        return jobRepository.findById(id)
                 .map(po -> modelMapper.map(po, Job.class))
                 .orElseThrow(() -> new NotFoundException("Job not found"));
-        redisUtil.saveObject(getJobCacheId(id), job);
-        return job;
     }
 
     private Job saveOrUpdateCategory(Job job) {
         JobPO savedJob = jobRepository.save(modelMapper.map(job, JobPO.class));
-//        redisUtil.saveObject(getJobCacheId(savedJob.getId()), savedJob);
-        eventPublisher.publishEvent(new ClearCacheAfterTransactionEvent(getJobCacheId(savedJob.getId())));
         return modelMapper.map(savedJob, Job.class);
-    }
-
-    private String getJobCacheId(String id) {
-        return "job:" + id;
     }
 }
