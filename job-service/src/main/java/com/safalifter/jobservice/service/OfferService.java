@@ -16,7 +16,6 @@ import com.safalifter.jobservice.request.offer.OfferUpdateRequest;
 import com.safalifter.jobservice.transaction.ClearCacheAfterTransactionEvent;
 import com.safalifter.jobservice.utils.RedisUtil;
 import lombok.RequiredArgsConstructor;
-import org.apache.catalina.User;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.modelmapper.ModelMapper;
 import org.springframework.context.ApplicationEventPublisher;
@@ -33,7 +32,6 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class OfferService {
     private final OfferRepository offerRepository;
-    private final AdvertService advertService;
     private final UserServiceClient userServiceclient;
     private final KafkaTemplate<String, SendNotificationRequest> kafkaTemplate;
     private final NewTopic topic;

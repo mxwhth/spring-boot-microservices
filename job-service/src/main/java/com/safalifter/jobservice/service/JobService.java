@@ -4,7 +4,6 @@ import com.safalifter.jobservice.client.FileStorageClient;
 import com.safalifter.jobservice.exc.NotFoundException;
 import com.safalifter.jobservice.model.Category;
 import com.safalifter.jobservice.model.Job;
-import com.safalifter.jobservice.po.CategoryPO;
 import com.safalifter.jobservice.po.JobPO;
 import com.safalifter.jobservice.repository.CategoryRepository;
 import com.safalifter.jobservice.repository.JobRepository;
@@ -35,7 +34,6 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class JobService {
     private final JobRepository jobRepository;
-    private final CategoryService categoryService;
     private final FileStorageClient fileStorageClient;
     private final ModelMapper modelMapper;
     private final RedisUtil redisUtil;
@@ -45,7 +43,9 @@ public class JobService {
 
     @Transactional
     public Job createJob(JobCreateRequest request, MultipartFile file) {
-        Category category = categoryService.getCategoryById(request.getCategoryId());
+        Category category = categoryRepository.findById(request.getCategoryId())
+                .map(po -> modelMapper.map(po, Category.class))
+                .orElseThrow(() -> new NotFoundException("Category not found"));
 
         String imageId = null;
 

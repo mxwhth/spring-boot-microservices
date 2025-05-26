@@ -3,11 +3,8 @@ package com.safalifter.jobservice.service;
 import com.safalifter.jobservice.client.FileStorageClient;
 import com.safalifter.jobservice.exc.NotFoundException;
 import com.safalifter.jobservice.model.Category;
-import com.safalifter.jobservice.model.Job;
 import com.safalifter.jobservice.po.CategoryPO;
-import com.safalifter.jobservice.po.JobPO;
 import com.safalifter.jobservice.repository.CategoryRepository;
-import com.safalifter.jobservice.repository.JobRepository;
 import com.safalifter.jobservice.request.category.CategoryCreateRequest;
 import com.safalifter.jobservice.request.category.CategoryUpdateRequest;
 import com.safalifter.jobservice.transaction.ClearCacheAfterTransactionEvent;
@@ -15,13 +12,11 @@ import com.safalifter.jobservice.utils.RedisUtil;
 import lombok.RequiredArgsConstructor;
 import org.modelmapper.ModelMapper;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
-import java.util.stream.Collector;
 import java.util.stream.Collectors;
 
 @Service
@@ -32,7 +27,6 @@ public class CategoryService {
     private final ModelMapper modelMapper;
     private final RedisUtil redisUtil;
     private final ApplicationEventPublisher eventPublisher;
-    private final JobRepository jobRepository;
 
     @Transactional
     public Category createCategory(CategoryCreateRequest request, MultipartFile file) {

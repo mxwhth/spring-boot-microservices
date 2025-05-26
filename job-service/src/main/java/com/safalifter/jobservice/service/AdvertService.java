@@ -7,12 +7,9 @@ import com.safalifter.jobservice.enums.AdvertStatus;
 import com.safalifter.jobservice.enums.Advertiser;
 import com.safalifter.jobservice.exc.NotFoundException;
 import com.safalifter.jobservice.model.Advert;
-import com.safalifter.jobservice.model.Category;
 import com.safalifter.jobservice.model.Job;
 import com.safalifter.jobservice.po.AdvertPO;
-import com.safalifter.jobservice.po.JobPO;
 import com.safalifter.jobservice.repository.AdvertRepository;
-import com.safalifter.jobservice.repository.CategoryRepository;
 import com.safalifter.jobservice.repository.JobRepository;
 import com.safalifter.jobservice.request.advert.AdvertCreateRequest;
 import com.safalifter.jobservice.request.advert.AdvertUpdateRequest;
@@ -34,7 +31,6 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class AdvertService {
     private final AdvertRepository advertRepository;
-    private final JobService jobService;
     private final UserServiceClient userServiceclient;
     private final FileStorageClient fileStorageClient;
     private final ModelMapper modelMapper;
@@ -45,7 +41,9 @@ public class AdvertService {
     @Transactional
     public Advert createAdvert(AdvertCreateRequest request, MultipartFile file) {
         String userId = getUserById(request.getUserId()).getId();
-        Job job = jobService.getJobById(request.getJobId());
+        Job job = jobRepository.findById(request.getJobId())
+                .map(po -> modelMapper.map(po, Job.class))
+                .orElseThrow(() -> new NotFoundException("Job not found"));
 
         String imageId = null;
 
