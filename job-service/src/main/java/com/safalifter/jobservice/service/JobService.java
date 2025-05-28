@@ -4,9 +4,10 @@ import com.safalifter.jobservice.client.FileStorageClient;
 import com.safalifter.jobservice.exc.NotFoundException;
 import com.safalifter.jobservice.model.Category;
 import com.safalifter.jobservice.model.Job;
-import com.safalifter.jobservice.po.CategoryPO;
+import com.safalifter.jobservice.po.JobKeyPO;
 import com.safalifter.jobservice.po.JobPO;
 import com.safalifter.jobservice.repository.CategoryRepository;
+import com.safalifter.jobservice.repository.JobKeyRepository;
 import com.safalifter.jobservice.repository.JobRepository;
 import com.safalifter.jobservice.request.job.JobCreateRequest;
 import com.safalifter.jobservice.request.job.JobUpdateRequest;
@@ -19,6 +20,7 @@ import org.redisson.api.RedissonClient;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.CollectionUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.ArrayList;
@@ -42,6 +44,7 @@ public class JobService {
     private final RedissonClient redissonClient;
     private final ApplicationEventPublisher eventPublisher;
     private final CategoryRepository categoryRepository;
+    private final JobKeyRepository jobKeyRepository;
 
     @Transactional
     public Job createJob(JobCreateRequest request, MultipartFile file) {
@@ -129,16 +132,16 @@ public class JobService {
 
     public List<Job> getJobsThatFitYourNeeds(String needs) {
         String[] keys = needs.replaceAll("\"", "").split(" ");
-        HashMap<String, Integer> map = new HashMap<>();
-        Arrays.stream(keys).forEach(key -> jobRepository.getJobsByKeysContainsIgnoreCase(key)
-                .forEach(job -> {
-                    if (map.containsKey(job.getId())) {
-                        int count = map.get(job.getId());
-                        map.put(job.getId(), count + 1);
-                    } else {
-                        map.put(job.getId(), 1);
-                    }
-                }));
+        var map = jobKeyRepository.getAllByKeyIn(
+                        Arrays.stream(keys).map(String::toUpperCase).toList()
+                ).stream()
+                .collect(Collectors.groupingBy(JobKeyPO::getJobId))
+                .entrySet()
+                .stream()
+                .collect(Collectors.toMap(
+                        Map.Entry::getKey,
+                        entry -> entry.getValue().size()
+                ));
         return map.entrySet().stream()
                 .sorted(Map.Entry.comparingByValue(Comparator.reverseOrder()))
                 .map(entry -> findJobById(entry.getKey()))
@@ -159,12 +162,23 @@ public class JobService {
         Job job = jobRepository.findById(id)
                 .map(po -> modelMapper.map(po, Job.class))
                 .orElseThrow(() -> new NotFoundException("Job not found"));
+        var jobKeys = jobKeyRepository.getAllByJobId(job.getId()).stream()
+                .map(JobKeyPO::getKey)
+                .toList();
+        job.setKeys(jobKeys);
         redisUtil.saveObject(getJobCacheId(id), job);
         return job;
     }
 
     private Job saveOrUpdateCategory(Job job) {
         JobPO savedJob = jobRepository.save(modelMapper.map(job, JobPO.class));
+        jobKeyRepository.deleteAllByJobId(savedJob.getId());
+        if (!CollectionUtils.isEmpty(job.getKeys())) {
+            List<JobKeyPO> jobKeyPOList = job.getKeys().stream()
+                    .map(key -> JobKeyPO.builder().jobId(savedJob.getId()).key(key).build())
+                    .toList();
+            jobKeyRepository.saveAll(jobKeyPOList);
+        }
 //        redisUtil.saveObject(getJobCacheId(savedJob.getId()), savedJob);
         eventPublisher.publishEvent(new ClearCacheAfterTransactionEvent(getJobCacheId(savedJob.getId())));
         return modelMapper.map(savedJob, Job.class);

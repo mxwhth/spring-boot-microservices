@@ -9,7 +9,5 @@ import java.util.List;
 public interface JobRepository extends JpaRepository<JobPO, String> {
     List<JobPO> getJobsByCategoryId(String id);
 
-    List<JobPO> getJobsByKeysContainsIgnoreCase(String key);
-
     List<JobPO> getJobsByCategoryIdIn(List<String> ids);
 }

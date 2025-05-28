@@ -4,19 +4,19 @@ import argparse
 from datetime import datetime
 from faker import Faker
 from tqdm import tqdm
-import psycopg
+import mysql.connector
 import bcrypt
 
 fake = Faker()
 
-def connect_to_db(host, user, password, database, port=5432):
-    return psycopg.connect(
+def connect_to_db(host, user, password, database, port=3306):
+    return mysql.connector.connect(
         host=host,
         user=user,
         password=password,
-        dbname=database,
+        database=database,
         port=port
-    )
+   )
 
 def insert_users(cursor, db, n=10000):
     print("Generating users...")
@@ -81,13 +81,13 @@ def insert_job_keys(cursor, db, job_ids, keys_per_job=3):
     job_keys = []
     for job_id in tqdm(job_ids, desc="Job Keys"):
         for _ in range(random.randint(1, keys_per_job)):
-            job_keys.append((job_id, fake.word()))
+            job_keys.append((str(uuid.uuid4()), job_id, fake.word()))
         if len(job_keys) % 10000 == 0:
-            cursor.executemany("INSERT INTO job_keys (job_id, key) VALUES (%s, %s)", job_keys)
+            cursor.executemany("INSERT INTO job_keys (id, job_id, `key`) VALUES (%s, %s, %s)", job_keys)
             db.commit()
             job_keys = []
     if job_keys:
-        cursor.executemany("INSERT INTO job_keys (job_id, key) VALUES (%s, %s)", job_keys)
+        cursor.executemany("INSERT INTO job_keys (id, job_id, `key`) VALUES (%s, %s, %s)", job_keys)
         db.commit()
 
 

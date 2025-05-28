@@ -15,7 +15,7 @@ SERVICES=(
 )
 
 # 定义要等待健康的容器名（与 docker-compose.yml 中保持一致）
-CONTAINERS=("postgres" "zookeeper" "kafka")
+CONTAINERS=("mysql" "zookeeper" "kafka")
 
 # 打包
 echo "🔨 开始打包所有服务..."
